@@ -129,7 +129,6 @@ def main():
             logger.error(message)
             send_message(bot, message)
         finally:
-            ...
             time.sleep(RETRY_PERIOD)
 
 
