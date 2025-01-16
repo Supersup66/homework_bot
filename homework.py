@@ -26,13 +26,6 @@ HOMEWORK_VERDICTS: dict[str, str] = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-"""logging.basicConfig(
-    format='%(asctime)s %(levelname)s %(message)s',
-    level=logging.DEBUG,
-    filename='main.log',
-    filemode='w'
-)"""
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler(stream=None)
