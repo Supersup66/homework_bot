@@ -113,11 +113,16 @@ def main():
         try:
             response = get_api_answer(timestamp)
             valid_response = check_response(response)
+            time_now = time.strftime(
+                '%H:%M %d-%m-%Y',
+                time.localtime(timestamp))
             if len(valid_response) == 0:
-                logger.debug('Статус домашки не изменился')
+                logger.debug(f'Статус домашки не менялся с {time_now}')
             else:
                 message = parse_status(valid_response[0])
                 send_message(bot, message)
+                timestamp = response['current_date']
+                logger.debug(f'Следущая проверка стартует с {time_now}')
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
