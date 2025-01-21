@@ -32,7 +32,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler(stream=sys.stdout)
 logger.addHandler(handler)
-file_handler = logging.FileHandler(filename='main.log', mode='w')
+file_handler = logging.FileHandler(
+    filename='main.log', mode='w', encoding='utf-8')
 logger.addHandler(file_handler)
 formatter = logging.Formatter(
     '%(asctime)s %(levelname)s %(funcName)s %(lineno)d %(message)s'
