@@ -8,7 +8,7 @@ import requests
 from dotenv import load_dotenv
 from telebot import TeleBot, apihelper
 
-from exceptions import NoTokenError
+from exceptions import NoTokenError, ResponseError, ResponseStatusError
 
 load_dotenv()
 
@@ -48,15 +48,19 @@ def check_tokens():
         'TELEGRAM_TOKEN: Токен доступа к телеграмм боту': TELEGRAM_TOKEN,
         'TELEGRAM_CHAT_ID: ID получателя сообщений': TELEGRAM_CHAT_ID}
     failed_list = []
-    for token in tokens:
-        if tokens[token] is None:
-            failed_list.append(token)
+    for description, token in tokens.items():
+        if token is None:
+            failed_list.append(description)
     if failed_list:
         logger.critical(
-            'Ошибка при проверке наличия токенов.'
-            f'Отсутствуют следующие токены: {*failed_list,}'
-            'Работа программы прекращена.')
-        raise NoTokenError('Отсутствуют необходимые токены.')
+            f'Ошибка при проверке наличия токенов. '
+            f'Отсутствуют следующие токены: '
+            f'{", ".join(failed for failed in failed_list) + ". "}'
+            f'Работа программы прекращена.')
+        raise NoTokenError(
+            f'Отсутствуют необходимые токены.'
+            f'{", ".join(failed for failed in failed_list) + ". "}'
+        )
 
 
 def send_message(bot, message):
@@ -82,18 +86,21 @@ def get_api_answer(timestamp):
         'headers': HEADERS,
         'params': {'from_date': timestamp}}
     try:
-        logger.debug(
-            'Делаем запрос к API:'
-            f'{request_settings}')
+        logger.debug(f'Делаем запрос к API: {request_settings}')
         response = requests.get(**request_settings)
-        if response.status_code != HTTPStatus.OK:
-            raise requests.exceptions.HTTPError('Ошибка в ответе сервера:')
-        response = response.json()
-        return response
+        return response.json()
+
     except requests.RequestException as error:
-        raise Exception(
-            f'Во время получения ответа сервера произошла ошибка'
+        raise ResponseError(
+            'Во время получения ответа сервера произошла ошибка'
             f'{error}')
+
+    finally:
+        if response.status_code != HTTPStatus.OK:
+            raise ResponseStatusError(
+                'Ошибка в ответе сервера. '
+                f'Сервер вернул статус: {response.status_code}'
+            )
 
 
 def check_response(response):
@@ -118,17 +125,25 @@ def parse_status(homework: dict[str, str]) -> str:
         homework_name = homework['homework_name']
         status = homework['status']
     except KeyError as error:
-        logger.error(f'{error}. В ответе API домашки нет необходимого ключа.')
-        raise KeyError
-
+        raise KeyError(
+            f'{error}. В ответе API домашки нет необходимого ключа.'
+        )
     try:
         verdict = HOMEWORK_VERDICTS[status]
     except KeyError as error:
-        logger.error(f'Неожиданный статус домашней работы: {status}. {error}')
         raise KeyError(
-            f'Неожиданный статус домашней работы: {status}. {error}')
-
+            f'Неожиданный статус домашней работы: {status}. {error}'
+        )
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+
+
+def unix_to_dt(timestamp):
+    """Преобразует UNIX в местное время."""
+    time_now = time.strftime(
+        '%H:%M %d-%m-%Y',
+        time.localtime(timestamp)
+    )
+    return time_now
 
 
 def main():
@@ -141,18 +156,14 @@ def main():
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-            time_now = time.strftime(
-                '%H:%M %d-%m-%Y',
-                time.localtime(timestamp))
+            time_now = unix_to_dt(timestamp)
             if not homeworks:
                 logger.debug(f'Статус домашки не менялся с {time_now}')
             else:
                 message = parse_status(homeworks[0])
                 if send_message(bot, message):
                     timestamp = response.get('current_date', timestamp)
-                    time_now = time.strftime(
-                        '%H:%M %d-%m-%Y',
-                        time.localtime(timestamp))
+                    time_now = unix_to_dt(timestamp)
                 logger.debug(f'Следущая проверка стартует с {time_now}')
 
         except Exception as error:
