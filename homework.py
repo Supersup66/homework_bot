@@ -8,6 +8,7 @@ import requests
 from dotenv import load_dotenv
 from telebot import TeleBot, apihelper
 
+
 from exceptions import NoTokenError, ResponseError, ResponseStatusError
 
 load_dotenv()
@@ -52,14 +53,15 @@ def check_tokens():
         if token is None:
             failed_list.append(description)
     if failed_list:
+        failed_str = ', '.join(failed for failed in failed_list)
         logger.critical(
-            f'Ошибка при проверке наличия токенов. '
-            f'Отсутствуют следующие токены: '
-            f'{", ".join(failed for failed in failed_list) + ". "}'
-            f'Работа программы прекращена.')
+            'Ошибка при проверке наличия токенов. '
+            'Отсутствуют следующие токены: '
+            f'{failed_str}. '
+            'Работа программы прекращена.')
         raise NoTokenError(
-            f'Отсутствуют необходимые токены.'
-            f'{", ".join(failed for failed in failed_list) + ". "}'
+            'Отсутствуют необходимые токены: '
+            f'{failed_str}. '
         )
 
 
@@ -88,19 +90,17 @@ def get_api_answer(timestamp):
     try:
         logger.debug(f'Делаем запрос к API: {request_settings}')
         response = requests.get(**request_settings)
-        return response.json()
-
     except requests.RequestException as error:
         raise ResponseError(
             'Во время получения ответа сервера произошла ошибка'
             f'{error}')
 
-    finally:
-        if response.status_code != HTTPStatus.OK:
-            raise ResponseStatusError(
-                'Ошибка в ответе сервера. '
-                f'Сервер вернул статус: {response.status_code}'
-            )
+    if response.status_code != HTTPStatus.OK:
+        raise ResponseStatusError(
+            'Ошибка в ответе сервера. '
+            f'Сервер вернул статус: {response.status_code}'
+        )
+    return response.json()
 
 
 def check_response(response):
